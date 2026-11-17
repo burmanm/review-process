@@ -90,7 +90,7 @@ A round runs several reviewers (models or setups) over the same merged PRs and s
 4. A finding the reviewer drops during its own verification is removed from the review it hands in.
 5. Every miss becomes a rule, a Cassandra fact or a worked example in [`REVIEW.md`](REVIEW.md). Then run the cheaper reviewers again on the same PRs.
 
-**Round 1 (2026-11-16).** PRs k8ssandra/cass-operator#995, #991 and #1001; Fable 5.2 without the rubric, Bob and DeepSeek with it. Each PR had one real defect that needed Cassandra knowledge or a list of every path into a check: the annotation fallback in #995, the stale FQL annotation after a container restart in #991, and local `LEFT` used as peer proof in #1001 (k8ssandra/cass-operator#1029). The rubric reviewers caught what the rubric spelled out and missed the rest. The Cassandra facts, cache, destructive-path and stale-state rules in `REVIEW.md` come from this round.
+**Round 1 (2026-11-16).** PRs k8ssandra/cass-operator#995, #991 and #1001; Fable 5.2 without the rubric, Bob and DeepSeek with it. The real defects (the annotation fallback in #995, local `LEFT` used as peer proof in #1001, k8ssandra/cass-operator#1029) needed either a list of every path into a destructive check or knowledge of Cassandra behaviour. Rubric reviewers caught what the rubric spelled out. The worst false positive (a "stale" FQL annotation in #991) came from not tracing what the operator already does to the pod when Cassandra crashes. The general rules added to `REVIEW.md` after this round target both: list every path, trace existing handling, and check server behaviour in the source instead of from memory.
 
 ## How the harvest was done (repeatable for other repos)
 
