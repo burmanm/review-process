@@ -64,7 +64,7 @@ Run `make test` before opening a PR. CI results appear on the PR, so don't paste
 
 <!-- confirm (D10) -->
 - **User-facing:** `CassandraDatacenter` and `CassandraTask` fields, annotations the operator reads, operator config and environment variables, changes in how operations behave, new status conditions, events and metrics.
-- **Where:** <!-- confirm: in-repo docs vs the k8ssandra docs site, and who picks up docs notes -->
+- **Where:** `docs/user/` in this repo (for example `docs/user/README.md` documents the decommission checks). <!-- confirm: also the k8ssandra docs site, and who picks up docs notes -->
 - **Format:** a docs note in the changelog fragment (`docs:` field) once step 1.6b lands; until then, a linked docs issue.
 - **New CRD fields** need a doc comment. controller-gen turns it into the field description that `kubectl explain` shows.
 
