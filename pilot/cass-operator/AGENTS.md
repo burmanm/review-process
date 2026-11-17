@@ -35,7 +35,7 @@ Run `make test` before opening a PR. CI results appear on the PR, so don't paste
 
 ## Conventions
 
-- Follow [`shared/go-operator-guidelines.md`](../../shared/go-operator-guidelines.md) <!-- confirm final location/link -->. It covers the reconcile loop, Kubernetes semantics, API design, Go style, comments and tests.
+- Follow [`shared/go-operator-guidelines.md`](../../shared/go-operator-guidelines.md) <!-- confirm final location/link -->. It covers the reconcile loop, Kubernetes semantics, API design, Go style, comments, tests, change hygiene, state and persistence, and evidence for library and server behaviour.
 - **CHANGELOG:** add an entry under `## unreleased` in the order `[CHANGE]`, `[FEATURE]`, `[ENHANCEMENT]`, `[BUGFIX]`. Every entry links its GitHub issue. Docs-only PRs need no entry. <!-- replace with the changelog-fragment instructions once step 1.6b lands -->
 - **Branch updates:** merge `master` into your branch only when there's a conflict. Don't rebase or force-push once human review has started.
 - **Lint suppressions:** avoid `//nolint`. If one is unavoidable, name the linter and give a reason; the PR will need human approval.
@@ -44,7 +44,7 @@ Run `make test` before opening a PR. CI results appear on the PR, so don't paste
 - **Server differences matter.** `serverType` is `cassandra`, `dse` or `hcd`, and behaviour often depends on version, for example 3.11, 4.x or 5.x. Gate version-specific code explicitly.
 - **Three test levels** (details in the [shared guidelines §6](../../shared/go-operator-guidelines.md#6-tests)):
   - **Unit tests** sit next to the code and use testify, with `require` for error checks.
-  - **envtest** suites live in the controller and webhook packages (`internal/controllers/*`, `internal/webhooks/*`), use Ginkgo/Gomega, and run against a real API server. Prefer envtest for controller behaviour.
+  - **envtest** suites live in the controller and webhook packages (`internal/controllers/*`, `internal/webhooks/*`), use Ginkgo/Gomega, and run against a real API server. Prefer envtest for controller behaviour, and for any reconcile logic that spans passes or waits for state from the API server. The many fake-client tests in `pkg/reconciliation` predate a usable envtest; extend one only when the change is a single function that table already owns.
   - **End-to-end** suites live in `tests/`, use Ginkgo/Gomega, and run on kind.
   - **Extend existing tests rather than adding new ones.** No standalone regression tests. A change that doesn't alter behaviour needs no new test, because the existing tests passing is the proof ([shared guidelines §6](../../shared/go-operator-guidelines.md#6-tests)).
 

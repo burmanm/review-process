@@ -13,16 +13,15 @@ A healthy Cassandra cluster gets disrupted. This includes an unexpected rolling 
 1. **Upgrade safety.** After an operator upgrade, existing clusters must behave as before unless the PR says otherwise.
    - Any change to the generated StatefulSet, pod template, Services or labels can restart or change every existing cluster. Flag it unless the PR says it is intended and the CHANGELOG mentions it.
    - Also look for changed behaviour on existing code paths: Management API client and transport settings, timeouts, defaults.
-   - **Option and default changes have consumers outside the diff.** When a PR changes a controller-runtime or manager option, a client or transport setting, or a default, list the code that depends on the old behaviour, even when it isn't in the diff. For the reconcile context, that means goroutines that use `rc.Ctx` (shared guidelines §1).
-   - **Cache changes have readers and writers outside the diff.** When a PR changes what the client caches or how (scoping by label or field, disabling the cache, transforms), list every read of that type, including exported helpers, and every code path that writes the label or field the cache is scoped on.
-   - **State recorded to skip work later.** When a PR stores state on an object (an annotation, label or status) so that it can skip a call later, list the events that change the real state behind it. For each one, trace what the existing code already does to that object, for example deletes or recreates it, before calling the stored state stale.
+   - Option, default and cache changes have consumers outside the diff (shared guidelines §2.7–2.8). Here that includes goroutines that use `rc.Ctx`, and the exported helpers in `pkg/` that other projects call.
+   - State recorded to skip a call later has to stay true (shared guidelines §9.10).
    - When the impact depends on the environment and you can't show it, ask whether the change is intended instead of describing a failure.
 2. **Server and version gating.** Behaviour differs across `cassandra`, `dse` and `hcd`, and across major versions. For example, MCAC exists only on older versions. Check that version-specific code is gated correctly and that the gate is right.
 3. **Order of checks, racks and StatefulSets.** Check rack balance, ordering, and acting on StatefulSets before their controller has caught up. Ask where in the sequence the edge case is handled.
    - `ReconcileAllRacks` runs an ordered list of checks. Look for a check that depends on state a later check loads or recovers.
 4. **Long operations as state machines.** Scale, decommission, replace and tasks must be resumable after a restart and must not finish early when a Management API call fails. Check what happens when a request fails halfway.
-   - **Every new blocking state names its exit.** For each new `result.Error`, `RequeueSoon`, `Done()` or latched condition, ask what clears it for each way it can be entered, and whether that code runs before this point in the pass. A `Done()` also names the watch event that brings the next pass. Check the controller's predicates: status-only changes usually don't trigger one. The test that owns the behaviour covers the unhappy exit.
-   - **Destructive steps need positive evidence on every path.** When a PR changes a check that leads to deleting data or removing a node, list every path into that check, including fallbacks behind annotations or flags, and the guards that run on each path. A guard after an early `return` doesn't protect that path. Something missing from a response is not proof of completion unless the target was positively identified. When a fallback swaps one data source for another, check that a later check doesn't compare the data with itself.
+   - Every new `result.Error`, `RequeueSoon`, `Done()` or latched condition names its exit and the event that brings the next pass (shared guidelines §1.12–1.13).
+   - Decommission, PVC cleanup and node replacement are destructive steps: every path into them needs positive evidence (shared guidelines §9.11).
 5. **Transient vs terminal errors and requeues** (shared guidelines §1). Look especially at code that polls Cassandra or the Management API.
 6. **Per-reconcile cost.** New reads of Secrets, PVCs, Endpoints or config on every reconcile are expensive in cluster-wide deployments.
 7. **Names and labels.** Kubernetes object names follow `metadata.name`, never the datacenter name override. Label value rules are not the same as annotation value rules.
@@ -31,10 +30,9 @@ A healthy Cassandra cluster gets disrupted. This includes an unexpected rolling 
    - Watch for changes to defaults or fields that k8ssandra-operator sets or reads.
    - Both projects import `pkg/httphelper` as a library, so a change to its exported behaviour is an API change.
    - k8ssandra-client passes its own transport for port-forwarded connections.
-10. **Tests prove the behaviour, at the right level.** Fake Management API features match what the test claims.
-    - Changes to controller wiring (watches, predicates, manager, cache or client options) and to webhooks come with envtest coverage. Reconcile logic in `pkg/reconciliation` is tested with unit tests, the fake client and the fake Management API.
+10. **Tests prove the behaviour, at the right level** (shared guidelines §6). Fake Management API features match what the test claims.
+    - `pkg/reconciliation` has many fake-client unit tests because they predate a usable envtest. That is history, not the rule. A change to a single function that an existing fake-client table test owns extends that table. Behaviour that spans reconcile passes, or that waits for or refreshes state from the API server, gets envtest coverage in `internal/controllers/cassandra` or `internal/controllers/control`.
     - Operational changes come with an end-to-end suite, or an explanation of why not. If the PR relies on Cassandra behaviour that the fake can't show and gives no evidence for it, ask under "Questions for the author". Don't report it as a finding.
-    - End-to-end changes: cleanup still deletes everything the suite creates. A suite changed to a new setup keeps the old setup covered, or says why not.
 11. **Mechanical changes and partial fixes.**
     - Lint rewrites, deprecation replacements and refactors are behaviour changes. The author states that each rewrite is equivalent, and the reviewer checks rewritten conditionals one by one. Conditions are tri-state (shared guidelines §2).
     - For a bug fix, ask what else on the same path has the same property.
@@ -46,22 +44,18 @@ Flag these as Important unless the item says otherwise. Items marked *(CI)* are 
 - **No changelog entry** *(CI, once the changelog check exists; there is none yet)*. Until changelog fragments (1.6b) land, the entry goes under `## unreleased` in `CHANGELOG.md`. Every change outside docs needs one, including a PR titled as a test fix that changes production code. Don't flag the category: which category fits is a judgement call.
 - Image or version references hardcoded in Go instead of `config/imageconfig/image_config.yaml`.
 - Unrelated changes: reformatting, untouched files in the diff, test data edited without the test needing it.
-- **User docs made wrong.** Search the user docs for the changed behaviour, annotation or field. A statement there that the PR makes false is Important, even when the PR doesn't touch docs.
-- **User-facing change without a docs note**: a change users can see (fields, annotations users set, behaviour, metrics) with no docs note or docs link, even when the changelog kind isn't `FEATURE`. **Nit** until changelog fragments (1.6b) give the note a place. Annotations and labels the operator writes for its own bookkeeping, which users don't set, aren't user-facing.
-- **Description or CHANGELOG doesn't match the code**: it describes a design or mechanism the code doesn't implement, claims more than the code fixes, or ticks a checklist item with no matching change. Important when it hides a difference in behaviour or compatibility, otherwise a Nit.
+- User docs made wrong (shared guidelines §8.8).
+- **User-facing change without a docs note** (shared guidelines §8.7), even when the changelog kind isn't `FEATURE`. **Nit** until changelog fragments (1.6b) give the note a place.
+- **Description or CHANGELOG doesn't match the code** (shared guidelines §8.9). Important when it hides a difference in behaviour or compatibility, otherwise a Nit.
 - **Test sprawl** (shared guidelines §6, items 7–8): standalone regression tests, new tests for a change that doesn't alter behaviour, or new tests that only repeat assertions an existing test already makes. Report it once per PR and list every such test. For each one, say which existing test the case belongs in, or that it can be deleted.
-  - An existing test **owns** the behaviour when it calls the same function with the same harness. A new scenario for that function is a new table row, adding a field to the table if needed, not a new test function.
   - **Important** when an existing test already owns the behaviour and the new test bypasses it.
   - **Nit** when no test owns the behaviour yet. Then the new test becomes the owning test, and renaming it after the behaviour or function is the whole fix.
 
 ## Needs a human (a marker, not a finding)
 
-Some changes need human approval whatever the risk tier, even when they are correct. Don't report them as findings. List them on one line at the end of the summary: `Needs human: <what> in <file:line, ...>. Explained in the description: yes/no.`
+New `//nolint` directives and changed or removed assertions in existing tests need human approval (shared guidelines §8.5–8.6) *(CI detector, T17)*. Don't report them as findings. List them on one line at the end of the summary: `Needs human: <what> in <file:line, ...>. Explained in the description: yes/no.`
 
-- **New `//nolint` directives** *(CI detector, T17)*. The directive must name the linter and give a reason.
-- **Changed or removed assertions in existing tests** *(CI detector, T17)*: different expected values, relaxed matchers, deleted checks, skipped tests. A renamed test whose expectations changed counts, and so does a setup change that makes an unchanged assertion check something else.
-
-The description explains a change only when it names the behaviour the assertion now pins. The PR's general goal is not enough. Report an Important finding only when the description doesn't explain the change, or the explanation doesn't match the diff. If the change also removes the only test of a behaviour, report the missing coverage as a finding and still list the assertion here.
+Report an Important finding only when the description doesn't explain the change, or the explanation doesn't match the diff.
 
 ## Intentional trade-offs
 
@@ -85,8 +79,7 @@ If the PR description states a trade-off or a known limitation, don't flag it. R
 
 - Every finding cites a file and line and describes the concrete failure: what breaks, for which cluster or version, and when. Say how often the trigger has to happen, and set the severity from that. Don't guess from a name. Read the code it calls.
 - Don't report a mechanism without tracing every function it names. Say what was traced and what was assumed.
-- A finding, or the dismissal of one, that depends on how a library behaves (controller-runtime, client-go, `net/http`) cites the library source at the version in `go.mod` (`$(go env GOMODCACHE)/<module>@<version>/<path>:<line>`), or a small probe. "Probably" is not evidence.
-- **Server behaviour is evidence too.** When a finding, or its dismissal, depends on how Cassandra, DSE or the Management API behaves (state transitions, timing, what survives a restart), find out first. Read the source for the version in use, or ask under "Questions for the author". Don't decide it from memory, in either direction.
+- Library and server behaviour need evidence (shared guidelines §10). Cite library source as `$(go env GOMODCACHE)/<module>@<version>/<path>:<line>`. For Cassandra, DSE or the Management API, read the source for the version in use or ask under "Questions for the author".
 - Conclusions from subagents are claims to verify, not findings.
 
 ## Limits
