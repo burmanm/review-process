@@ -126,7 +126,7 @@ Report a finding only when the description doesn't explain the change.
 ## Evidence
 - Every finding must cite a file and line, and explain the concrete failure: what breaks, when, and how often the trigger has to happen. No guesses based on names alone.
 - Trace every function a mechanism names before reporting it. Say what was traced and what was assumed.
-- A finding, or the dismissal of one, that depends on library behaviour cites the library source at the version the repo pins (Go: `$(go env GOMODCACHE)/<module>@<version>/<path>:<line>`), or a small probe.
+- A finding, or the dismissal of one, that depends on library behaviour cites the library source at the version the repo pins (Go: `<module>@<version>/<path>:<line>`), or a small probe.
 - Conclusions from subagents are claims to verify, not findings.
 
 ## Limits
