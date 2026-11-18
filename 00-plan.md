@@ -342,7 +342,7 @@ Every change a user can see ships with user documentation, or at least a **docs 
 
 **User-facing** means anything a user configures, sees or depends on: CRD fields and their defaults, annotations and labels the operator reads, operator flags, config and environment variables, changes in how operations behave (scale, upgrade, tasks), new status conditions, events and metrics, and deprecated or removed features. Refactors, test changes and internal packages aren't user-facing.
 
-**Per-repo rules** go in the repo's `AGENTS.md` under "User documentation" ([template](03-templates.md#2-agentsmd-project-context)), because they differ from repo to repo:
+**Per-repo rules** go in the repo's `AGENTS.md` under "User documentation" ([template](04-templates.md#2-agentsmd-project-context)), because they differ from repo to repo:
 - **where** the docs go: in-repo `docs/`, a separate docs repo, or the docs team's tracker;
 - **format**: a full docs page, or a docs note for the docs team;
 - **who** picks it up.
@@ -450,7 +450,7 @@ They are related but not the same thing:
 
 So we don't keep an "explainer library". An explainer is a personal learning aid. **The learning is made durable in two hand-done steps**: explaining the area back to an owner, then writing or updating the developer doc for whatever the docs were missing. Over time the developer docs fill in exactly where people needed them, written by the people who just learned it.
 
-Open question: how much of this is formal process vs. habit? (See [`02-open-questions.md`](02-open-questions.md), section K.)
+Each adopting team decides how much of this is formal process vs. habit (see [`02-team-adoption.md`, section K](02-team-adoption.md#k--knowledge-sharing--anti-silo)); record the choices in the team profile.
 
 ---
 

@@ -6,8 +6,9 @@ The documents are **team-neutral**: they describe the process, the layers and th
 |---|---|---|
 | [`00-plan.md`](00-plan.md) | The plan: layers, where humans stay in the loop, review-state labels, CI friction, dependency updates, per-project docs, feedback loops, knowledge sharing, OSS | Use as-is |
 | [`01-steps.md`](01-steps.md) | Phased step list with exit criteria. Every step is tagged 🟢 Core / 🟡 Later / ⚪ At scale, so a small team knows where to start | Use as-is |
-| [`02-open-questions.md`](02-open-questions.md) | What still needs investigating or deciding, plus decisions made so far | Use as-is |
-| [`03-templates.md`](03-templates.md) | PR template, `AGENTS.md` / `REVIEW.md` templates, risk tiers, CODEOWNERS, workflow sketches | Use as-is |
+| [`02-team-adoption.md`](02-team-adoption.md) | Questionnaire each adopting team answers; answers and adoption progress live in its team profile | Record answers and progress in your team profile |
+| [`03-process-tracker.md`](03-process-tracker.md) | Shared process investigations, implementation progress and decision history | Consult for shared dependencies; maintained by process authors |
+| [`04-templates.md`](04-templates.md) | PR template, `AGENTS.md` / `REVIEW.md` templates, risk tiers, CODEOWNERS, workflow sketches | Adapt per repo |
 | [`tooling.md`](tooling.md) | The tools and agents the plan needs, and which exist yet | Use as-is |
 | [`teams/<team>.md`](teams/) | Team context, pain points, team structure, how review load and ownership are split in *that* team, team-specific decisions | Write your own from [`teams/README.md`](teams/README.md) |
 | [`pilot/<repo>/`](pilot/) | Baseline data and drafts of `AGENTS.md`, `REVIEW.md` and lint changes for a pilot repo | Use as a worked example |
