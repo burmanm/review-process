@@ -80,6 +80,18 @@ People who authored or reviewed in each area, over the same period:
 | 5.1b | Decide fork-PR handling (T16) before the reviewer workflow goes live, since outside contributors open PRs here |
 | 6.2 | Eval set: use past `[BUGFIX]` entries in the CHANGELOG that link to the PR that introduced the bug, plus bugs found in review (the harvested comments show where), confirmed by the main maintainer. Audits of existing code are a third source |
 
+## Review rounds (comparing reviewer models)
+
+A round runs several reviewers (models or setups) over the same merged PRs and scores them against a fixed answer key. It shows what the guidance misses, and whether a cheaper model can match a more expensive one.
+
+1. Give every reviewer the same PR list and check that each output covers every PR.
+2. Reviewers read the code, the PR description and the linked issue, never the PR comments. Issue searches stop at the PR's merge date (`gh issue list --search "created:<YYYY-MM-DD"`), so bugs reported later don't leak into the review.
+3. Score against an answer key of verified defects. Count real defects, hygiene items and false positives separately. Hygiene items are mechanical and would otherwise dominate the counts.
+4. A finding the reviewer drops during its own verification is removed from the review it hands in.
+5. Every miss becomes a rule, a Cassandra fact or a worked example in [`REVIEW.md`](REVIEW.md). Then run the cheaper reviewers again on the same PRs.
+
+**Round 1 (2026-11-16).** PRs k8ssandra/cass-operator#995, #991 and #1001; Fable 5.2 without the rubric, Bob and DeepSeek with it. The real defects (the annotation fallback in #995, local `LEFT` used as peer proof in #1001, k8ssandra/cass-operator#1029) needed either a list of every path into a destructive check or knowledge of Cassandra behaviour. Rubric reviewers caught what the rubric spelled out. The worst false positive (a "stale" FQL annotation in #991) came from not tracing what the operator already does to the pod when Cassandra crashes. The general rules added after this round (in `shared/go-operator-guidelines.md`, referenced from `REVIEW.md`) target both: list every path, trace existing handling, and check server behaviour in the source instead of from memory.
+
 ## How the harvest was done (repeatable for other repos)
 
 1. Fetch all PR review comments: `GET /repos/{owner}/{repo}/pulls/comments` (paginate with `page=`).

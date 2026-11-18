@@ -13,14 +13,16 @@ A healthy Cassandra cluster gets disrupted. This includes an unexpected rolling 
 1. **Upgrade safety.** After an operator upgrade, existing clusters must behave as before unless the PR says otherwise.
    - Any change to the generated StatefulSet, pod template, Services or labels can restart or change every existing cluster. Flag it unless the PR says it is intended and the CHANGELOG mentions it.
    - Also look for changed behaviour on existing code paths: Management API client and transport settings, timeouts, defaults.
-   - **Option and default changes have consumers outside the diff.** When a PR changes a controller-runtime or manager option, a client or transport setting, or a default, list the code that depends on the old behaviour, even when it isn't in the diff. For the reconcile context, that means goroutines that use `rc.Ctx` ([shared §1](../../shared/go-operator-guidelines.md#1-reconcile-loop)).
+   - Option, default and cache changes have consumers outside the diff (shared guidelines §2.7–2.8). Here that includes goroutines that use `rc.Ctx`, and the exported helpers in `pkg/` that other projects call.
+   - State recorded to skip a call later has to stay true (shared guidelines §9.10).
    - When the impact depends on the environment and you can't show it, ask whether the change is intended instead of describing a failure.
 2. **Server and version gating.** Behaviour differs across `cassandra`, `dse` and `hcd`, and across major versions. For example, MCAC exists only on older versions. Check that version-specific code is gated correctly and that the gate is right.
 3. **Order of checks, racks and StatefulSets.** Check rack balance, ordering, and acting on StatefulSets before their controller has caught up. Ask where in the sequence the edge case is handled.
    - `ReconcileAllRacks` runs an ordered list of checks. Look for a check that depends on state a later check loads or recovers.
 4. **Long operations as state machines.** Scale, decommission, replace and tasks must be resumable after a restart and must not finish early when a Management API call fails. Check what happens when a request fails halfway.
-   - **Every new blocking state names its exit.** For each new `result.Error`, `RequeueSoon`, `Done()` or latched condition, ask what clears it for each way it can be entered, and whether that code runs before this point in the pass. A `Done()` also names the watch event that brings the next pass: status-only changes don't trigger one, since the predicates are `GenerationChanged || AnnotationChanged`. The test that owns the behaviour covers the unhappy exit.
-5. **Transient vs terminal errors and requeues** ([shared guidelines §1](../../shared/go-operator-guidelines.md#1-reconcile-loop)). Look especially at code that polls Cassandra or the Management API.
+   - Every new `result.Error`, `RequeueSoon`, `Done()` or latched condition names its exit and the event that brings the next pass (shared guidelines §1.12–1.13).
+   - Decommission, PVC cleanup and node replacement are destructive steps: every path into them needs positive evidence (shared guidelines §9.11).
+5. **Transient vs terminal errors and requeues** (shared guidelines §1). Look especially at code that polls Cassandra or the Management API.
 6. **Per-reconcile cost.** New reads of Secrets, PVCs, Endpoints or config on every reconcile are expensive in cluster-wide deployments.
 7. **Names and labels.** Kubernetes object names follow `metadata.name`, never the datacenter name override. Label value rules are not the same as annotation value rules.
 8. **Webhook coverage.** Invalid transitions, such as scaling down while scaling up, are blocked in the webhook, not handled late in reconcile.
@@ -28,29 +30,30 @@ A healthy Cassandra cluster gets disrupted. This includes an unexpected rolling 
    - Watch for changes to defaults or fields that k8ssandra-operator sets or reads.
    - Both projects import `pkg/httphelper` as a library, so a change to its exported behaviour is an API change.
    - k8ssandra-client passes its own transport for port-forwarded connections.
-10. **Tests prove the behaviour, at the right level.** Fake Management API features match what the test claims. Controller and webhook changes come with envtest coverage. Operational changes come with an end-to-end suite, or an explanation of why not.
+10. **Tests prove the behaviour, at the right level** (shared guidelines §6). Fake Management API features match what the test claims.
+    - `pkg/reconciliation` has many fake-client unit tests because they predate a usable envtest. That is history, not the rule. A change to a single function that an existing fake-client table test owns extends that table. Behaviour that spans reconcile passes, or that waits for or refreshes state from the API server, gets envtest coverage in `internal/controllers/cassandra` or `internal/controllers/control`.
+    - Operational changes come with an end-to-end suite, or an explanation of why not. If the PR relies on Cassandra behaviour that the fake can't show and gives no evidence for it, ask under "Questions for the author". Don't report it as a finding.
 11. **Mechanical changes and partial fixes.**
-    - Lint rewrites, deprecation replacements and refactors are behaviour changes. The author states that each rewrite is equivalent, and the reviewer checks rewritten conditionals one by one. Conditions are tri-state ([shared §2](../../shared/go-operator-guidelines.md#2-kubernetes-semantics)).
+    - Lint rewrites, deprecation replacements and refactors are behaviour changes. The author states that each rewrite is equivalent, and the reviewer checks rewritten conditionals one by one. Conditions are tri-state (shared guidelines §2).
     - For a bug fix, ask what else on the same path has the same property.
 
 ## Repo hygiene
 
-Flag these as Important unless the item says otherwise. Items marked *(CI)* are mechanical. They stay here only until the matching CI check exists, then the line is deleted ([plan §3.1](../../00-plan.md#31-deterministic-checks-are-code-not-review)).
+Flag these as Important unless the item says otherwise. Items marked *(CI)* are mechanical. They stay here only until the matching CI check exists, then the line is deleted.
 
 - **No changelog entry** *(CI, once the changelog check exists; there is none yet)*. Until changelog fragments (1.6b) land, the entry goes under `## unreleased` in `CHANGELOG.md`. Every change outside docs needs one, including a PR titled as a test fix that changes production code. Don't flag the category: which category fits is a judgement call.
 - Image or version references hardcoded in Go instead of `config/imageconfig/image_config.yaml`.
 - Unrelated changes: reformatting, untouched files in the diff, test data edited without the test needing it.
-- **User-facing change without docs**: a change users can see (fields, annotations, behaviour, metrics) with no docs note or docs link, even when the changelog kind isn't `FEATURE` ([plan §5.6](../../00-plan.md#56-user-facing-documentation-docs-sync)).
-- **Test sprawl** ([shared §6, items 7–8](../../shared/go-operator-guidelines.md#6-tests)): standalone regression tests, new tests for a change that doesn't alter behaviour, or new tests that only repeat assertions an existing test already makes. Report it once per PR and list every such test. For each one, say which existing test the case belongs in, or that it can be deleted.
+- User docs made wrong (shared guidelines §8.8).
+- **User-facing change without a docs note** (shared guidelines §8.7), even when the changelog kind isn't `FEATURE`. **Nit** until changelog fragments (1.6b) give the note a place.
+- **Description or CHANGELOG doesn't match the code** (shared guidelines §8.9). Important when it hides a difference in behaviour or compatibility, otherwise a Nit.
+- **Test sprawl** (shared guidelines §6, items 7–8): standalone regression tests, new tests for a change that doesn't alter behaviour, or new tests that only repeat assertions an existing test already makes. Report it once per PR and list every such test. For each one, say which existing test the case belongs in, or that it can be deleted.
   - **Important** when an existing test already owns the behaviour and the new test bypasses it.
   - **Nit** when no test owns the behaviour yet. Then the new test becomes the owning test, and renaming it after the behaviour or function is the whole fix.
 
 ## Needs a human (a marker, not a finding)
 
-Some changes need human approval whatever the risk tier, even when they are correct. Don't report them as findings. List them on one line at the end of the summary: `Needs human: <what> in <file:line, ...>. Explained in the description: yes/no.`
-
-- **New `//nolint` directives** *(CI detector, T17)*. The directive must name the linter and give a reason.
-- **Changed or removed assertions in existing tests** *(CI detector, T17)*: different expected values, relaxed matchers, deleted checks, skipped tests.
+New `//nolint` directives and changed or removed assertions in existing tests need human approval (shared guidelines §8.5–8.6) *(CI detector, T17)*. Don't report them as findings. List them on one line at the end of the summary: `Needs human: <what> in <file:line, ...>. Explained in the description: yes/no.`
 
 Report an Important finding only when the description doesn't explain the change, or the explanation doesn't match the diff.
 
@@ -63,6 +66,7 @@ If the PR description states a trade-off or a known limitation, don't flag it. R
 - Style the linter enforces (`.golangci.yml`).
 - Comments the shared guidelines say to delete. Flag that as a single Nit per PR, not one finding per comment.
 - The wording of error and log messages that use the terms users know. For example, "the Cassandra version does not support it" is fine when the exact cause is the Management API image.
+- What CI already checks: the linked issue, and generated files (`make manifests generate` must leave no diff).
 
 ## Skip these paths
 
@@ -75,7 +79,7 @@ If the PR description states a trade-off or a known limitation, don't flag it. R
 
 - Every finding cites a file and line and describes the concrete failure: what breaks, for which cluster or version, and when. Say how often the trigger has to happen, and set the severity from that. Don't guess from a name. Read the code it calls.
 - Don't report a mechanism without tracing every function it names. Say what was traced and what was assumed.
-- A finding, or the dismissal of one, that depends on how a library behaves (controller-runtime, client-go, `net/http`) cites the library source at the version in `go.mod` (`$(go env GOMODCACHE)/<module>@<version>/<path>:<line>`), or a small probe. "Probably" is not evidence.
+- Library and server behaviour need evidence (shared guidelines §10). Cite library source as `$(go env GOMODCACHE)/<module>@<version>/<path>:<line>`. For Cassandra, DSE or the Management API, read the source for the version in use or ask under "Questions for the author".
 - Conclusions from subagents are claims to verify, not findings.
 
 ## Limits
@@ -83,12 +87,13 @@ If the PR description states a trade-off or a known limitation, don't flag it. R
 - At most 3 Nits per review.
 - Tag each finding Important, Nit or Pre-existing.
 - A transient error that surfaces as a Warning event or an error log but converges is a Nit, unless it loops.
+- A rare trigger that ends in something irreversible, such as deleted data or a node removed too early, is Important. Say that the trigger is rare and what it needs.
 - **Pre-existing** findings don't count toward the limits.
   - List them in the summary only, not as inline comments.
-  - Give each one a one-line proposed `tech-debt` issue. Check first whether an issue already exists.
-- Don't repeat findings already posted on this PR.
+  - Give each one a one-line proposed `tech-debt` issue. Check first whether an issue already exists. If you can't search the tracker, write "not checked".
+- Don't repeat findings already posted on this PR. If you can't see the PR discussion, say so once and review as if there were none.
 - If the same problem appears in several places, report it once and list every location.
 
 ## Summary format
 
-Start with a count, for example "N important, M nits, K pre-existing." If there is nothing to fix, say so plainly. End with the `Needs human:` line when it applies.
+Start with a count, for example "N important, M nits, K pre-existing." If there is nothing to fix, say so plainly. Put questions for the author, such as unverifiable Cassandra behaviour or a trade-off to confirm, under "Questions for the author". They don't count as findings. End with the `Needs human:` line when it applies.
